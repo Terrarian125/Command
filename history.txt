@@ -3,3 +3,8 @@ help
 add
 Test
 test
+game1
+reload
+game1
+game1
+‚ 
