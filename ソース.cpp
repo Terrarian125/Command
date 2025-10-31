@@ -1,20 +1,29 @@
-﻿#include <iostream>
+#define _CRT_SECURE_NO_WARNINGS // localtimeのセキュリティ警告を抑制
+
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <map>
 #include <cstdlib>
-#include <iomanip> // ★ 追加: std::setw のために必要
-// nlohmann::json のパスは環境に合わせてください
-#include "json.hpp" // https://github.com/nlohmann/json
+#include <iomanip> 
+#include <chrono>   
+#include <ctime>    
+#include <vector>   
+#include <random>   
+#include "json.hpp" // nlohmann::json のパスは環境に合わせてください
 using json = nlohmann::json;
+
+// =========================================================
+// ユーティリティ関数
+// =========================================================
 
 // ==== 外部ファイルからコマンドとURLの対応を読み込む ====
 std::map<std::string, std::string> loadCommands(const std::string& filename) {
     std::map<std::string, std::string> commandMap;
     std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "エラー: " << filename << " を開けませんでした。\n";
+        std::cerr << "エラー: '" << filename << "' を開けませんでした。\n";
         return commandMap;
     }
 
@@ -30,11 +39,11 @@ std::map<std::string, std::string> loadCommands(const std::string& filename) {
     return commandMap;
 }
 
-// ==== 外部ファイルにコマンドとURLの対応を書き込む (新規追加) ====
+// ==== 外部ファイルにコマンドとURLの対応を書き込む ====
 void saveCommands(const std::map<std::string, std::string>& commandMap, const std::string& filename) {
     std::ofstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "エラー: " << filename << " への書き込みに失敗しました。\n";
+        std::cerr << "エラー: '" << filename << "' への書き込みに失敗しました。\n";
         return;
     }
     for (const auto& [command, url] : commandMap) {
@@ -78,13 +87,87 @@ void saveHistory(const std::string& command) {
     hist << command << "\n";
 }
 
-// ==== メイン ====
+// ==== 外部ファイルから格言リストを読み込む (新規追加) ====
+std::vector<std::string> loadAphorisms(const std::string& filename) {
+    std::vector<std::string> aphorisms;
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "警告: 格言ファイル '" << filename << "' を開けませんでした。デフォルトの格言を使用します。\n";
+        return { "格言ファイルがありません", "油断大敵", "継続は力なり" };
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.find_first_not_of(' ') != std::string::npos) {
+            aphorisms.push_back(line);
+        }
+    }
+
+    if (aphorisms.empty()) {
+        std::cerr << "警告: 格言ファイル '" << filename << "' は空です。デフォルトの格言を使用します。\n";
+        return { "格言ファイルが空です", "思い立ったが吉日" };
+    }
+
+    return aphorisms;
+}
+
+// ==== today コマンドの実装 (新規追加) ====
+void displayTodayInfo() {
+    // 1. 現在時刻の取得
+    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm_struct = *std::localtime(&now); // _CRT_SECURE_NO_WARNINGSで警告を抑制
+
+    // 2. 令和の年数を計算 (令和元年=2019年)
+    int rewa_year = tm_struct.tm_year + 1900 - 2018;
+
+    // 3. 曜日の日本語表記
+    const char* weekdays[] = { "日", "月", "火", "水", "木", "金", "土" };
+    const char* current_weekday = weekdays[tm_struct.tm_wday];
+
+    // 4. 時刻と日付のフォーマット
+    std::stringstream ss_time;
+    // put_timeで時間をフォーマット
+    ss_time << std::put_time(&tm_struct, "%H時%M分");
+
+    // 5. 格言リストを外部ファイルから読み込む (静的変数で一度だけ読み込む)
+    static std::vector<std::string> aphorisms = loadAphorisms("aphorisms.txt");
+
+    // 6. ランダムな格言の選択 (日付をシードとして使用し、毎日同じ格言を出す)
+    std::string today_aphorism = "格言なし";
+    if (!aphorisms.empty()) {
+        // 現在時刻を日単位に丸めてシードとして使用
+        static std::mt19937 generator(static_cast<unsigned int>(now / (60 * 60 * 24)));
+        std::uniform_int_distribution<int> distribution(0, aphorisms.size() - 1);
+        today_aphorism = aphorisms[distribution(generator)];
+    }
+
+    // 7. 出力フォーマット
+    std::cout << "\n=== Today's Info ===\n";
+    std::cout << "R" << rewa_year << "年 "
+        << (tm_struct.tm_year + 1900) << "/"
+        << std::setfill('0') << std::setw(2) << tm_struct.tm_mon + 1 << "/"
+        << std::setfill('0') << std::setw(2) << tm_struct.tm_mday
+        << "(" << current_weekday << ")"
+        << " " << ss_time.str()
+        << " : " << today_aphorism << "\n";
+    std::cout << "====================\n";
+}
+
+// =========================================================
+// メイン
+// =========================================================
+
 int main() {
+#ifdef _WIN32
+    // Windows環境でのみ実行
+    // コマンドプロンプトの文字コードをUTF-8 (65001) に変更
+    system("chcp 65001 > nul");
+#endif
     std::map<std::string, std::string> commands = loadCommands("command_list.txt");
 
     if (commands.empty()) {
         std::cerr << "エラー: 'command_list.txt' の読み込みに失敗したか空です。\n";
-        // 続行するためにファイルを作成します
         saveCommands(commands, "command_list.txt");
     }
 
@@ -99,7 +182,6 @@ int main() {
         std::cout << "\n> コマンド入力: ";
         std::string inputCommand;
 
-        // 堅牢な入力のため、改行文字を無視し、一行全体を受け取ります
         if (!(std::getline(std::cin >> std::ws, inputCommand))) break;
         if (inputCommand.empty()) continue;
 
@@ -111,6 +193,12 @@ int main() {
             break;
         }
 
+        // === today ===
+        if (inputCommand == "today") {
+            displayTodayInfo();
+            continue;
+        }
+
         // === help ===
         if (inputCommand == "help") {
             std::cout << "=== 使い方 ===\n"
@@ -118,7 +206,8 @@ int main() {
                 << "・list : 登録済みコマンド一覧\n"
                 << "・search : コマンド名で検索\n"
                 << "・add : 新しいコマンドを追加\n"
-                << "・delete : 既存のコマンドを削除 (★New)\n"
+                << "・delete : 既存のコマンドを削除\n"
+                << "・today : 現在の日時と今日の格言を表示\n"
                 << "・reload : command_list.txt を再読み込み\n"
                 << "・exit : 終了\n";
             continue;
@@ -166,14 +255,14 @@ int main() {
             if (!(std::cin >> newUrl)) continue;
 
             commands[newCmd] = newUrl;
-            saveCommands(commands, "command_list.txt"); // ファイルに書き込み
-            exportToJson(commands, "command_list.json"); // JSONを更新
+            saveCommands(commands, "command_list.txt");
+            exportToJson(commands, "command_list.json");
 
             std::cout << "✅ 追加完了: " << newCmd << " → " << newUrl << "\n";
             continue;
         }
 
-        // === delete (追加機能) ===
+        // === delete ===
         if (inputCommand == "delete") {
             std::string delCmd;
             std::cout << "削除するコマンド名: ";
@@ -189,7 +278,6 @@ int main() {
 
                 commands.erase(delCmd);
 
-                // ファイルとJSONを更新
                 saveCommands(commands, "command_list.txt");
                 exportToJson(commands, "command_list.json");
 
@@ -201,21 +289,18 @@ int main() {
             continue;
         }
 
-        // === URLまたは実行ファイルの実行 (修正済み) ===
+        // === URLまたは実行ファイルの実行 ===
         if (commands.count(inputCommand)) {
             const std::string& target = commands.at(inputCommand);
             std::string openCommand;
 
-            // ターゲットがURLであるかどうかの簡単なチェック
             bool isUrl = (target.find("http://") == 0 || target.find("https://") == 0 || target.find("file://") == 0);
 
             if (isUrl) {
-                // URLの場合: getOpenCommand 関数を使ってOSに応じたブラウザオープンコマンドを生成
                 std::cout << " -> URL: " << target << " を開きます...\n";
                 openCommand = getOpenCommand(target);
             }
             else {
-                // 実行ファイル名/パスの場合: そのままシステムコマンドとして実行 (例: game1.exe, A.exe)
                 std::cout << " -> 実行ファイル/コマンド: " << target << " を実行します...\n";
                 openCommand = target;
             }
