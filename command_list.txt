@@ -1,6 +1,6 @@
 Git:https://github.com/
-PI:https://paiza.io/ja/projects/new
+Google:Blo.exe
 N:https://www.natureasia.com/ja-jp/nature
-Google:https://www.google.com/Test:https://abehiroshi.la.coocan.jp/
+PI:https://paiza.io/ja/projects/new
 game1:Rogue.exe
 game2:Blo.exe

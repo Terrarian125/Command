@@ -94,7 +94,7 @@ std::vector<std::string> loadAphorisms(const std::string& filename) {
 
     if (!file.is_open()) {
         std::cerr << "警告: 格言ファイル '" << filename << "' を開けませんでした。デフォルトの格言を使用します。\n";
-        return { "格言ファイルがありません", "油断大敵", "継続は力なり" };
+        return { "格言ファイルがありません"};
     }
 
     std::string line;
@@ -106,7 +106,7 @@ std::vector<std::string> loadAphorisms(const std::string& filename) {
 
     if (aphorisms.empty()) {
         std::cerr << "警告: 格言ファイル '" << filename << "' は空です。デフォルトの格言を使用します。\n";
-        return { "格言ファイルが空です", "思い立ったが吉日" };
+        return { "格言ファイルが空です"};
     }
 
     return aphorisms;
